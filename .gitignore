@@ -1,0 +1,11 @@
+# ignore cache
+__pycache__
+
+# ognore vscode env
+.vscode
+
+# ignore models
+*.pth
+
+# ignore data
+data/

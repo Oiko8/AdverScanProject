@@ -110,10 +110,9 @@ def check_d1(model, test_loader, pgd_accuracies):
     for i, eps in enumerate(EPSILONS):
         fgsm_acc = evaluate_fgsm(model, test_loader, eps)
         pgd_acc  = pgd_accuracies[i]
-        flag     = "⚠ D1 FIRED" if fgsm_acc > pgd_acc else "ok"
+        d1_fired = (fgsm_acc < pgd_acc)
+        flag     = "⚠ D1 FIRED" if d1_fired else "ok"
 
-        if fgsm_acc > pgd_acc:
-            d1_fired = True
 
         eps_label = f"{round(eps*255)}/255"
         print(f"  {eps_label:<12} {fgsm_acc:>9.1f}% {pgd_acc:>9.1f}% {flag:>12}")

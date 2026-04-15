@@ -5,6 +5,7 @@ BASE_DIR   = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA_DIR   = os.path.join(BASE_DIR, "data")
 OUTPUT_DIR = os.path.join(BASE_DIR, "outputs")
 MODEL_DIR  = os.path.join(BASE_DIR, "models")
+REPORT_DIR = os.path.join(BASE_DIR, "report")
 
 # ── Device ───────────────────────────────────────────────────────────────────
 import torch

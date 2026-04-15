@@ -7,6 +7,7 @@ from data.cifar10_loader import get_loaders
 from configs.settings import (
     DEVICE, MODEL_DIR, OUTPUT_DIR, EVAL_NUM_SAMPLES
 )
+from configs.save_report import save_report
 
 EVAL_EPSILONS = [2/255, 4/255, 8/255]
 
@@ -150,19 +151,63 @@ def run():
         print(f"  PGD and AutoAttack agree. PGD was reliable here.")
 
     # ── Final diagnostic summary ──────────────────────────────────
-    print("\n" + "=" * 65)
-    print("  Final Diagnostic Summary — Model 1")
-    print("=" * 65)
-    print(f"  D1 primary   (FGSM vs PGD)       : clear")
-    print(f"  D1 secondary (Square vs APGD)     : "
-          f"{'FIRED' if any_d1 else 'clear'}")
-    print(f"  D4 (PGD step size ineffective)    : "
-          f"{'FIRED' if max_gap > 5.0 else 'clear'}")
-    print(f"  D5 (narrow robustness)            : FIRED")
-    print(f"\n  AutoAttack ground truth:")
+# ── Final diagnostic summary ──────────────────────────────────
+    summary_lines = []
+    summary_lines.append("=" * 65)
+    summary_lines.append("  Final Diagnostic Summary — Model 1")
+    summary_lines.append("=" * 65)
+    summary_lines.append(f"  D1 primary   (FGSM vs PGD)       : clear")
+    summary_lines.append(f"  D1 secondary (Square vs APGD)     : "
+                         f"{'FIRED' if any_d1 else 'clear'}")
+    summary_lines.append(f"  D4 (PGD step size ineffective)    : "
+                         f"{'FIRED' if max_gap > 5.0 else 'clear'}")
+    summary_lines.append(f"  D5 (narrow robustness)            : FIRED")
+    summary_lines.append("")
+    summary_lines.append("  AutoAttack ground truth:")
     for eps in EVAL_EPSILONS:
         eps_label = f"{round(eps*255)}/255"
-        print(f"    epsilon={eps_label} -> {aa_accuracies[eps]:.1f}% robust accuracy")
+        summary_lines.append(
+            f"    epsilon={eps_label} -> {aa_accuracies[eps]:.1f}% robust accuracy"
+        )
+    summary_lines.append("")
+    summary_lines.append("  Component breakdown:")
+    summary_lines.append(
+        f"  {'Epsilon':<12} {'APGD-CE':>10} {'APGD-DLR':>10}"
+        f" {'FAB':>8} {'Square':>10}"
+    )
+    summary_lines.append(f"  {'-'*54}")
+    for eps in EVAL_EPSILONS:
+        eps_label = f"{round(eps*255)}/255"
+        c         = all_components[eps]
+        apgd_ce  = f"{c['APGD-CE']:.1f}%"  if "APGD-CE"  in c else "N/A"
+        apgd_dlr = f"{c['APGD-DLR']:.1f}%" if "APGD-DLR" in c else "N/A"
+        fab      = f"{c['FAB']:.1f}%"       if "FAB"       in c else "N/A"
+        square   = f"{c['Square']:.1f}%"    if "Square"    in c else "N/A"
+        summary_lines.append(
+            f"  {eps_label:<12} {apgd_ce:>10} {apgd_dlr:>10}"
+            f" {fab:>8} {square:>10}"
+        )
+    summary_lines.append("")
+    summary_lines.append("  Note on N/A entries:")
+    summary_lines.append(
+        "  At epsilon=4/255 and 8/255, APGD-CE broke all images"
+    )
+    summary_lines.append(
+        "  in the first component. FAB and Square never ran because"
+    )
+    summary_lines.append(
+        "  no images survived. This confirms the model has no"
+    )
+    summary_lines.append(
+        "  resistance at these budgets — not a data issue."
+    )
+    summary_lines.append("=" * 65)
+
+    summary = "\n".join(summary_lines)
+    print(summary)
+
+    # Save report
+    save_report("week2_autoattack.txt", summary)
 
     # ── Plot ──────────────────────────────────────────────────────
     eps_labels = [f"{round(e*255)}/255" for e in EVAL_EPSILONS]

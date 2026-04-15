@@ -7,7 +7,7 @@ def save_report(filename, content):
     Saves a plain text report to the outputs directory.
 
     Args:
-        filename : e.g. "week2_autoattack.txt"
+        filename : e.g. "part2_autoattack.txt"
         content  : string content to write
     """
     os.makedirs(REPORT_DIR, exist_ok=True)

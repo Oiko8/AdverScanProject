@@ -207,7 +207,7 @@ def run():
     print(summary)
 
     # Save report
-    save_report("week2_autoattack.txt", summary)
+    save_report("part2_autoattack.txt", summary)
 
     # ── Plot ──────────────────────────────────────────────────────
     eps_labels = [f"{round(e*255)}/255" for e in EVAL_EPSILONS]

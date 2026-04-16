@@ -51,3 +51,6 @@ our PGD at epsilon=2/255        →  robust accuracy: 80.2%
 - Run the stages 1 and 2 on a robust model to take different diagnostics.
 - Load model 2 from RobustBench.
 - **Note**: Model 1 (ResNet-18) and Model 2 (ResNet-50) differ in architecture. Observed robustness differences are primarily attributed to adversarial training rather than capacity, as standard ResNet-50 baselines show equivalent fragility to ResNet-18 under AutoAttack at epsilon=8/255.
+- There was a need for correction on epsilon. Usage of scaled epsilon since I used normalized inputs.
+- Adversarial training completely transforms the model's behavior under attack.
+- D5 fires between epsilon=8/255 and epsilon=16/255 with a 39.2% drop. This is not a flaw — it is a feature of adversarial training and a textbook finding. The Engstrom2019 model was trained with adversarial training at exactly epsilon=8/255.

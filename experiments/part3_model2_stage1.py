@@ -8,7 +8,7 @@ from data.cifar10_loader import get_loaders
 from configs.save_report import save_report
 from configs.settings import (
     DEVICE, OUTPUT_DIR, EPSILONS,
-    PGD_STEPS, PGD_RESTARTS, EVAL_NUM_SAMPLES
+    PGD_STEPS, PGD_RESTARTS, EVAL_NUM_SAMPLES, scale_epsilon
 )
 
 # Model 1 PGD results for comparison
@@ -65,7 +65,10 @@ def run():
     accuracies = {}
 
     for eps in EPSILONS:
-        acc = evaluate_robust(model, test_loader, eps)
+        # Scale epsilon from raw pixel space to normalized space
+        eps_scaled = scale_epsilon(eps) if eps > 0 else 0
+
+        acc = evaluate_robust(model, test_loader, eps_scaled)
         accuracies[eps] = acc
         eps_label = f"{round(eps*255):2d}/255" if eps > 0 else " 0/255"
         print(f"  epsilon = {eps_label}  ->  robust accuracy = {acc:.1f}%")

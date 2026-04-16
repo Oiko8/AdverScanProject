@@ -13,9 +13,9 @@ EVAL_EPSILONS = [2/255, 4/255, 8/255]
 
 # PGD results from Week 1 for direct comparison
 PGD_ACCURACIES = {
-    2/255: 80.2,
-    4/255: 55.9,
-    8/255: 13.9,
+    2/255: 5.9,
+    4/255: 0.1,
+    8/255: 0.0,
 }
 
 

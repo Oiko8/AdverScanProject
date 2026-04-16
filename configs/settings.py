@@ -37,3 +37,19 @@ PGD_RESTARTS = 3       # random restarts per sample
 # ── Evaluation ────────────────────────────────────────────────────────────────
 EVAL_BATCH_SIZE  = 128
 EVAL_NUM_SAMPLES = 1000   # run attacks on 1000 test images (standard in literature)
+
+# ── Sccaling Epsilon ──────────────────────────────────────────────────────────
+# CIFAR-10 std values (per channel)
+CIFAR10_STD_VALUES = (0.2023, 0.1994, 0.2010)
+
+def scale_epsilon(epsilon_raw):
+    """
+    Scales a raw-pixel-space epsilon to normalized space.
+    PGD operates in normalized space, so epsilon must be scaled
+    by 1/std to preserve the correct raw-pixel perturbation budget.
+
+    epsilon_raw  : perturbation budget in [0,1] pixel space (e.g. 8/255)
+    returns      : epsilon in normalized space
+    """
+    min_std = min(CIFAR10_STD_VALUES)
+    return epsilon_raw / min_std

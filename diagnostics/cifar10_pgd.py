@@ -5,8 +5,9 @@ import matplotlib.pyplot as plt
 from models.resnet_model import get_model
 from data.cifar10_loader import get_loaders
 from configs.settings import (
-    DEVICE, MODEL_DIR, OUTPUT_DIR, EPSILONS, EVAL_NUM_SAMPLES
+    DEVICE, MODEL_DIR, OUTPUT_DIR, EPSILONS, EVAL_NUM_SAMPLES, scale_epsilon
 )
+from configs.save_report import save_report
 
 
 # ── FGSM (single step) ───────────────────────────────────────────────────────
@@ -15,6 +16,8 @@ def fgsm_attack(model, images, labels, epsilon):
     """Single-step FGSM attack."""
     if epsilon == 0:
         return images.clone()
+    
+    scaled_epsilon = scale_epsilon(epsilon)
 
     images = images.clone().requires_grad_(True)
     criterion = nn.CrossEntropyLoss()
@@ -24,7 +27,7 @@ def fgsm_attack(model, images, labels, epsilon):
     loss.backward()
 
     with torch.no_grad():
-        adv = images + epsilon * images.grad.sign()
+        adv = images + scaled_epsilon * images.grad.sign()
         adv = torch.clamp(adv, -2.4291, 2.7537)
 
     return adv.detach()
@@ -201,7 +204,7 @@ def plot_trajectory(trajectory, d4_fired, epsilon=8/255):
 
 def run():
     # PGD accuracies from week1_baseline — paste your results here
-    pgd_accuracies = [92.6, 80.2, 55.9, 13.9, 0.3]
+    pgd_accuracies = [92.6, 5.9, 0.1, 0.0, 0.0]
 
     model = get_model().to(DEVICE)
     model.load_state_dict(torch.load(
@@ -212,19 +215,28 @@ def run():
 
     _, test_loader = get_loaders()
 
-    print("=" * 55)
-    print("  Model 1 — D1 and D4 Diagnostic Checks")
-    print("=" * 55)
+
+    # ── Report ────────────────────────────────────────────────────────────────────── 
+    summary_lines = []
+    summary_lines.append("=" * 55)
+    summary_lines.append("  Model 1 — D1 and D4 Diagnostic Checks")
+    summary_lines.append("=" * 55)
 
     d1_fired              = check_d1(model, test_loader, pgd_accuracies)
     d4_fired, trajectory  = check_d4(model, test_loader)
     plot_trajectory(trajectory, d4_fired)
 
-    print("\n── Summary ───────────────────────────────────────────────────")
-    print(f"  D1 (gradient masking) : {'FIRED' if d1_fired else 'clear'}")
-    print(f"  D4 (loss consistency) : {'FIRED' if d4_fired else 'clear'}")
-    print(f"  D5 (narrow robustness): FIRED")
-    print("  (D5 confirmed from week1_baseline results)")
+
+    summary_lines.append("\n── Summary ───────────────────────────────────────────────────")
+    summary_lines.append(f"  D1 (gradient masking) : {'FIRED' if d1_fired else 'clear'}")
+    summary_lines.append(f"  D4 (loss consistency) : {'FIRED' if d4_fired else 'clear'}")
+    summary_lines.append(f"  D5 (narrow robustness): FIRED")
+    summary_lines.append("  (D5 confirmed from week1_baseline results)")
+
+    summary = "\n".join(summary_lines)
+    print(summary)
+
+    save_report("part1_pgd.txt", summary)
 
 
 if __name__ == "__main__":

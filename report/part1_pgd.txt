@@ -1,0 +1,9 @@
+=======================================================
+  Model 1 — D1 and D4 Diagnostic Checks
+=======================================================
+
+── Summary ───────────────────────────────────────────────────
+  D1 (gradient masking) : clear
+  D4 (loss consistency) : clear
+  D5 (narrow robustness): FIRED
+  (D5 confirmed from week1_baseline results)

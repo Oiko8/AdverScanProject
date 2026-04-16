@@ -7,7 +7,7 @@ from attacks.pgd import pgd_attack
 from data.cifar10_loader import get_loaders
 from configs.settings import (
     DEVICE, MODEL_DIR, OUTPUT_DIR, EPSILONS,
-    PGD_STEPS, PGD_RESTARTS, EVAL_NUM_SAMPLES
+    PGD_STEPS, PGD_RESTARTS, EVAL_NUM_SAMPLES, scale_epsilon
 )
 
 
@@ -69,7 +69,8 @@ def run():
     accuracies = []
 
     for eps in EPSILONS:
-        acc = evaluate_robust(model, test_loader, eps)
+        eps_scaled = scale_epsilon(eps) if eps > 0 else 0
+        acc = evaluate_robust(model, test_loader, eps_scaled)
         accuracies.append(acc)
         eps_label = f"{round(eps * 255):2d}/255" if eps > 0 else " 0/255"
         print(f"  epsilon = {eps_label}  ->  robust accuracy = {acc:.1f}%")

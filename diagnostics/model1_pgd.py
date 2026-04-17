@@ -68,6 +68,8 @@ def pgd_loss_trajectory(model, images, labels, epsilon, steps=100):
     if epsilon == 0:
         return []
 
+    epsilon   = scale_epsilon(epsilon)
+
     step_size = epsilon / 10
     criterion = nn.CrossEntropyLoss()
     images    = images.to(DEVICE)

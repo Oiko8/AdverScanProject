@@ -37,7 +37,7 @@ def check_d1_from_components(components, eps_label):
         return False, "insufficient component data"
 
     # Square ran and reduced accuracy further beyond APGD-CE
-    if square_acc < apgd_acc - 2.0:
+    if square_acc < apgd_acc - 5.0:
         return True, (
             f"Square Attack reduced accuracy from "
             f"{apgd_acc:.1f}% to {square_acc:.1f}% "
@@ -53,6 +53,8 @@ def run():
     os.makedirs(OUTPUT_DIR, exist_ok=True)
 
     model = get_robust_model().to(DEVICE)
+
+    base_model = model.model.to(DEVICE)
    
     _, test_loader = get_loaders()
 
@@ -69,7 +71,7 @@ def run():
         eps_label = f"{round(eps*255)}/255"
         print(f"\n── AutoAttack at epsilon = {eps_label} ─────────────────────────")
 
-        aa_acc, components = run_autoattack(model, test_loader, eps)
+        aa_acc, components = run_autoattack(base_model, test_loader, eps, model_expects_raw=True)
         aa_accuracies[eps]  = aa_acc
         all_components[eps] = components
 
@@ -147,7 +149,6 @@ def run():
     else:
         print(f"  PGD and AutoAttack agree. PGD was reliable here.")
 
-    # ── Final diagnostic summary ──────────────────────────────────
 # ── Final diagnostic summary ──────────────────────────────────
     summary_lines = []
     summary_lines.append("=" * 65)

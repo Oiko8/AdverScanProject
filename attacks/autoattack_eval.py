@@ -5,13 +5,25 @@ import autoattack
 from configs.settings import DEVICE, EVAL_NUM_SAMPLES
 
 
-def run_autoattack(model, loader, epsilon, num_samples=EVAL_NUM_SAMPLES):
+def run_autoattack(model, loader, epsilon,
+                   num_samples=EVAL_NUM_SAMPLES,
+                   model_expects_raw=False):
     """
     Runs AutoAttack ensemble on the model at a given epsilon.
 
+    Args:
+        model            : the model to attack
+        loader           : data loader (produces normalized images)
+        epsilon          : perturbation budget in raw [0,1] space
+        num_samples      : number of test images to evaluate
+        model_expects_raw: if True, model expects [0,1] input directly
+                           (e.g. RobustBench base models).
+                           if False, model expects normalized input
+                           (e.g. our standard ResNet-18).
+
     Returns:
-        accuracy      : robust accuracy under AutoAttack (%)
-        components    : dict with per-component accuracy breakdown
+        accuracy  : robust accuracy under AutoAttack (%)
+        components: dict with per-component accuracy breakdown
     """
     model.eval()
 
@@ -39,31 +51,37 @@ def run_autoattack(model, loader, epsilon, num_samples=EVAL_NUM_SAMPLES):
 
     images_01 = torch.clamp(images * std + mean, 0, 1)
 
-    # ── Wrap model to handle [0,1] input ──────────────────────────
-    class NormalizedModel(torch.nn.Module):
-        def __init__(self, model, mean, std):
-            super().__init__()
-            self.model = model
-            self.mean  = mean
-            self.std   = std
+    # ── Wrap model if it expects normalized input ─────────────────
+    if model_expects_raw:
+        # Model already expects [0,1] — use directly, no wrapping
+        eval_model = model
+    else:
+        # Model expects normalized input — wrap so AutoAttack can
+        # feed it [0,1] and the wrapper normalizes internally
+        class NormalizedModel(torch.nn.Module):
+            def __init__(self, model, mean, std):
+                super().__init__()
+                self.model = model
+                self.mean  = mean
+                self.std   = std
 
-        def forward(self, x):
-            return self.model((x - self.mean) / self.std)
+            def forward(self, x):
+                return self.model((x - self.mean) / self.std)
 
-    wrapped = NormalizedModel(model, mean, std).to(DEVICE)
-    wrapped.eval()
+        eval_model = NormalizedModel(model, mean, std).to(DEVICE)
 
-    # ── Run AutoAttack, capture verbose output ─────────────────────
+    eval_model.eval()
+
+    # ── Run AutoAttack ─────────────────────────────────────────────
     adversary = autoattack.AutoAttack(
-        wrapped,
+        eval_model,
         norm="Linf",
         eps=epsilon,
         version="standard",
         verbose=True
     )
 
-    # Capture stdout so we can parse component results
-    captured = io.StringIO()
+    captured   = io.StringIO()
     sys_stdout = sys.stdout
     sys.stdout = captured
 
@@ -73,17 +91,15 @@ def run_autoattack(model, loader, epsilon, num_samples=EVAL_NUM_SAMPLES):
 
     sys.stdout = sys_stdout
     log = captured.getvalue()
-
-    # Print the log so the user still sees it
     print(log)
 
-    # ── Parse per-component accuracies from log ───────────────────
-    components = {}
+    # ── Parse per-component accuracies ────────────────────────────
+    components    = {}
     component_map = {
-        "apgd-ce" : "APGD-CE",
-        "apgd-t"  : "APGD-DLR",
-        "fab-t"   : "FAB",
-        "square"  : "Square",
+        "apgd-ce": "APGD-CE",
+        "apgd-t" : "APGD-DLR",
+        "fab-t"  : "FAB",
+        "square" : "Square",
     }
 
     for line in log.splitlines():
@@ -98,7 +114,7 @@ def run_autoattack(model, loader, epsilon, num_samples=EVAL_NUM_SAMPLES):
 
     # ── Final robust accuracy ──────────────────────────────────────
     with torch.no_grad():
-        outputs      = wrapped(adv_images)
+        outputs      = eval_model(adv_images)
         _, predicted = outputs.max(1)
         correct      = predicted.eq(labels).sum().item()
 

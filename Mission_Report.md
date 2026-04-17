@@ -54,3 +54,13 @@ our PGD at epsilon=2/255        →  robust accuracy: 80.2%
 - There was a need for correction on epsilon. Usage of scaled epsilon since I used normalized inputs.
 - Adversarial training completely transforms the model's behavior under attack.
 - D5 fires between epsilon=8/255 and epsilon=16/255 with a 39.2% drop. This is not a flaw — it is a feature of adversarial training and a textbook finding. The Engstrom2019 model was trained with adversarial training at exactly epsilon=8/255.
+- D5 fires on both but means completely different things — total fragility on Model 1, epsilon-boundary cliff on Model 2.
+
+---
+
+## Part 4
+
+---
+
+- Context: A transfer attack generates adversarial examples on a **surrogate** model (model 1 in this case) and then tests if those examples also effectively fool a target model (Model 2). The logic is: if Model 2 looks robust under direct PGD but is still fooled by examples from a completely different model, then its robustness may be partially an artifact of gradient behavior rather than genuine decision boundary hardening.
+- Carlini and Wagner insight : transferability increases with confidence.

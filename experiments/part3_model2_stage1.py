@@ -12,11 +12,10 @@ from configs.settings import (
 )
 
 # Model 1 PGD results for comparison
-# [92.6, 5.9, 0.1, 0.0, 0.0]
 MODEL1_PGD = {
     0/255: 92.6,
-    2/255: 5.9,
-    4/255: 0.1,
+    2/255: 1.2,
+    4/255: 0.0,
     8/255: 0.0,
    16/255: 0.0,
 }
@@ -137,7 +136,7 @@ def run():
 
     plt.figure(figsize=(8, 5))
     plt.plot(eps_labels, m1_vals, marker="o", linewidth=2,
-             color="#C0392B", markersize=7, label="Model 1 — Standard ResNet-18")
+             color="#C0392B", markersize=7, label="Model 1 — Standard ResNet-50")
     plt.plot(eps_labels, m2_vals, marker="s", linewidth=2,
              color="#2E75B6", markersize=7, label="Model 2 — Adv. Trained ResNet-50")
 

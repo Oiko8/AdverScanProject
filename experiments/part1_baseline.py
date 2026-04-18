@@ -1,7 +1,7 @@
 import os
 import torch
 import matplotlib.pyplot as plt
-from models.resnet_model import get_model
+from models.resnet_model import get_model, get_model_resnet50
 from models.train import evaluate
 from attacks.pgd import pgd_attack
 from data.cifar10_loader import get_loaders
@@ -51,9 +51,9 @@ def run():
     os.makedirs(OUTPUT_DIR, exist_ok=True)
 
     # Load trained model
-    model = get_model().to(DEVICE)
+    model = get_model_resnet50().to(DEVICE)
     model.load_state_dict(torch.load(
-        os.path.join(MODEL_DIR, "model1_standard.pth"),
+        os.path.join(MODEL_DIR, "model1_standard_resnet50.pth"),
         weights_only=True
     ))
     model.eval()
@@ -61,7 +61,7 @@ def run():
     _, test_loader = get_loaders()
 
     print("=" * 55)
-    print(f"  Model 1 — Standard ResNet-18")
+    print(f"  Model 1 — Standard ResNet-50")
     print(f"  PGD steps: {PGD_STEPS}  |  Restarts: {PGD_RESTARTS}")
     print(f"  Samples  : {EVAL_NUM_SAMPLES}")
     print("=" * 55)
@@ -89,7 +89,7 @@ def run():
                      textcoords="offset points", xytext=(0, 10),
                      ha="center", fontsize=10)
 
-    plt.title("Model 1 — Standard ResNet-18\nAccuracy vs. PGD Epsilon (CIFAR-10)",
+    plt.title("Model 1 — Standard ResNet-50\nAccuracy vs. PGD Epsilon (CIFAR-10)",
               fontsize=13)
     plt.xlabel("Perturbation budget (epsilon)", fontsize=11)
     plt.ylabel("Accuracy (%)", fontsize=11)

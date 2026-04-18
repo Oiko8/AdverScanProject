@@ -2,7 +2,7 @@ import os
 import torch
 import torch.nn as nn
 import matplotlib.pyplot as plt
-from models.resnet_model import get_model
+from models.resnet_model import get_model, get_model_resnet50
 from data.cifar10_loader import get_loaders
 from configs.settings import (
     DEVICE, MODEL_DIR, OUTPUT_DIR, EPSILONS, EVAL_NUM_SAMPLES, scale_epsilon
@@ -206,11 +206,11 @@ def plot_trajectory(trajectory, d4_fired, epsilon=8/255):
 
 def run():
     # PGD accuracies from week1_baseline — paste your results here
-    pgd_accuracies = [92.6, 5.9, 0.1, 0.0, 0.0]
+    pgd_accuracies = [92.6, 1.2, 0.0, 0.0, 0.0]
 
-    model = get_model().to(DEVICE)
+    model = get_model_resnet50().to(DEVICE)
     model.load_state_dict(torch.load(
-        os.path.join(MODEL_DIR, "model1_standard.pth"),
+        os.path.join(MODEL_DIR, "model1_standard_resnet50.pth"),
         weights_only=True
     ))
     model.eval()

@@ -64,3 +64,21 @@ our PGD at epsilon=2/255        →  robust accuracy: 80.2%
 
 - Context: A transfer attack generates adversarial examples on a **surrogate** model (model 1 in this case) and then tests if those examples also effectively fool a target model (Model 2). The logic is: if Model 2 looks robust under direct PGD but is still fooled by examples from a completely different model, then its robustness may be partially an artifact of gradient behavior rather than genuine decision boundary hardening.
 - Carlini and Wagner insight : transferability increases with confidence.
+- Calculating CW loss for high confident adversarial examples to prove Carlini and Wagner point that transferability increases with hig confidence.
+- Run PGD attack but with using CW loss and not cross entropy. 
+
+```
+Model 1 (surrogate)                    Model 2 (target)
+      |                                       |
+      | ← generate_transfer_examples()        |
+      |   using CW loss + kappa=20            |
+      |   produces high-confidence adv        |
+      |   examples that strongly fool M1      |
+      |                                       |
+      └─── adv_images ──────────────────────► evaluate_transfer() 
+                                              forward pass only
+                                              no gradients used
+                                              returns success rate
+```
+
+- Change model 1 from resnet-18 to resnet-50 for better comparison with the adv. trained resnet-50. In the first parts the standard resnet-50 has similar behaviour on the pgd attack like the resnet-18, but breaks more easily.

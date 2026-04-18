@@ -1,7 +1,7 @@
 import os
 import torch
 import matplotlib.pyplot as plt
-from models.resnet_model import get_model
+from models.resnet_model import get_model, get_model_resnet50
 from attacks.autoattack_eval import run_autoattack
 from data.cifar10_loader import get_loaders
 from configs.settings import (
@@ -13,8 +13,8 @@ EVAL_EPSILONS = [2/255, 4/255, 8/255]
 
 # PGD results from Week 1 for direct comparison
 PGD_ACCURACIES = {
-    2/255: 5.9,
-    4/255: 0.1,
+    2/255: 1.2,
+    4/255: 0.0,
     8/255: 0.0,
 }
 
@@ -50,9 +50,9 @@ def check_d1_from_components(components, eps_label):
 def run():
     os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-    model = get_model().to(DEVICE)
+    model = get_model_resnet50().to(DEVICE)
     model.load_state_dict(torch.load(
-        os.path.join(MODEL_DIR, "model1_standard.pth"),
+        os.path.join(MODEL_DIR, "model1_standard_resnet50.pth"),
         weights_only=True
     ))
     model.eval()

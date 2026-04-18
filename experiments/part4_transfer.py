@@ -85,11 +85,137 @@ def check_d2(pgd_accuracy, transfer_success_rate, epsilon):
     d2_fired = pgd_accuracy > 60.0 and transfer_success_rate > 40.0
     return d2_fired
 
+def run_kappa_sweep(surrogate, target, loader,
+                    epsilon=8/255,
+                    kappas=[5, 10, 20, 30, 40],
+                    num_samples=500):
+    """
+    Sweeps kappa values at a fixed epsilon to show how
+    attack confidence affects transferability.
+    Reproduces the Carlini & Wagner Section VIII-D finding.
+    """
+    from attacks.transfer_attack import (
+        generate_transfer_examples, evaluate_transfer
+    )
+
+    surrogate.eval()
+    target.eval()
+
+    # Collect images once
+    all_images = []
+    all_labels = []
+    total      = 0
+
+    for images, labels in loader:
+        if total >= num_samples:
+            break
+        remaining      = num_samples - total
+        all_images.append(images[:remaining])
+        all_labels.append(labels[:remaining])
+        total += images[:remaining].size(0)
+
+    images = torch.cat(all_images, dim=0).to(DEVICE)
+    labels = torch.cat(all_labels, dim=0).to(DEVICE)
+
+    eps_scaled = scale_epsilon(epsilon)
+    eps_label  = f"{round(epsilon*255)}/255"
+
+    print(f"\n── Kappa Sweep at epsilon = {eps_label} ─────────────────────")
+    print(f"  {'Kappa':>8} {'Surr. fool%':>13} {'Transfer%':>11} {'Interpretation':>20}")
+    print(f"  {'-'*58}")
+
+    results = {}
+
+    for kappa in kappas:
+        adv = generate_transfer_examples(
+            surrogate, images, labels,
+            epsilon=eps_scaled,
+            kappa=kappa,
+            steps=100
+        )
+
+        s_succ, s_acc = evaluate_transfer(surrogate, adv, labels)
+        t_succ, t_acc = evaluate_transfer(target,    adv, labels)
+
+        results[kappa] = {
+            "surrogate_success" : s_succ,
+            "transfer_success"  : t_succ,
+        }
+
+        if kappa == 0:
+            interp = "barely adversarial"
+        elif kappa <= 10:
+            interp = "moderate confidence"
+        elif kappa <= 20:
+            interp = "high confidence"
+        else:
+            interp = "very high confidence"
+
+        print(f"  {kappa:>8} {s_succ:>12.1f}% {t_succ:>10.1f}%"
+              f" {interp:>20}")
+
+    # ── Plot ──────────────────────────────────────────────────────
+    kappa_vals  = list(results.keys())
+    surr_vals   = [results[k]["surrogate_success"] for k in kappa_vals]
+    trans_vals  = [results[k]["transfer_success"]  for k in kappa_vals]
+
+    plt.figure(figsize=(8, 5))
+    plt.plot(kappa_vals, surr_vals, marker="o", linewidth=2,
+             color="#C0392B", markersize=8,
+             label="Surrogate fool rate (Model 1)")
+    plt.plot(kappa_vals, trans_vals, marker="s", linewidth=2,
+             color="#2E75B6", markersize=8,
+             label="Transfer success (→ Model 2)")
+
+    for k, t in zip(kappa_vals, trans_vals):
+        plt.annotate(f"{t:.1f}%", (k, t),
+                     textcoords="offset points",
+                     xytext=(0, 10), ha="center", fontsize=9)
+
+    plt.axvline(x=20, color="gray", linestyle="--",
+                alpha=0.5, label="kappa=20 (our default)")
+    plt.title(
+        f"Transfer Attack — Kappa Sweep at epsilon={eps_label}\n"
+        f"Carlini & Wagner confidence vs. transferability",
+        fontsize=12
+    )
+    plt.xlabel("Kappa (confidence margin)", fontsize=11)
+    plt.ylabel("Attack success rate (%)", fontsize=11)
+    plt.ylim(0, 100)
+    plt.grid(True, alpha=0.3)
+    plt.legend(fontsize=10)
+    plt.tight_layout()
+
+    save_path = os.path.join(OUTPUT_DIR, "part4_kappa_sweep.png")
+    plt.savefig(save_path, dpi=150)
+    plt.close()
+    print(f"\n  Plot saved to: {save_path}")
+
+    # ── Save to report ─────────────────────────────────────────────
+    report_lines = []
+    report_lines.append("=" * 60)
+    report_lines.append(f"  Kappa Sweep — epsilon={eps_label}")
+    report_lines.append(f"  Reproduces Carlini & Wagner Section VIII-D")
+    report_lines.append("=" * 60)
+    report_lines.append(
+        f"  {'Kappa':>8} {'Surr. fool%':>13} {'Transfer%':>11}"
+    )
+    report_lines.append(f"  {'-'*36}")
+    for k in kappa_vals:
+        r = results[k]
+        report_lines.append(
+            f"  {k:>8} {r['surrogate_success']:>12.1f}%"
+            f" {r['transfer_success']:>10.1f}%"
+        )
+    report_lines.append("=" * 60)
+    save_report("part4_kappa_sweep.txt", "\n".join(report_lines))
+
+    return results
 
 def run():
     os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-    # Load surrogate (Model 1 — standard ResNet-18)
+    # Load surrogate (Model 1 — standard ResNet-50)
     surrogate = get_model_resnet50().to(DEVICE)
     surrogate.load_state_dict(torch.load(
         os.path.join(MODEL_DIR, "model1_standard_resnet50.pth"),
@@ -105,7 +231,7 @@ def run():
 
     print("=" * 65)
     print("  Stage 4 — Transfer Attack Evaluation")
-    print("  Surrogate : Model 1 (standard ResNet-18)")
+    print("  Surrogate : Model 1 (standard ResNet-50)")
     print("  Target    : Model 2 (adv. trained ResNet-50)")
     print(f"  Samples   : {EVAL_NUM_SAMPLES}")
     print(f"  Kappa     : 20.0 (high-confidence CW loss)")
@@ -198,7 +324,7 @@ def run():
     report_lines = []
     report_lines.append("=" * 65)
     report_lines.append("  Stage 4 — Transfer Attack Report")
-    report_lines.append("  Surrogate: Model 1 (standard ResNet-18)")
+    report_lines.append("  Surrogate: Model 1 (standard ResNet-50)")
     report_lines.append("  Target   : Model 2 (adv. trained ResNet-50)")
     report_lines.append("=" * 65)
     report_lines.append(
@@ -223,6 +349,20 @@ def run():
     )
     report_lines.append("=" * 65)
     save_report("part4_transfer.txt", "\n".join(report_lines))
+
+
+    # ── Kappa sweep ───────────────────────────────────────────────
+    print("\n" + "=" * 65)
+    print("  Kappa Sweep — Confidence vs. Transferability")
+    print("  Fixed epsilon=8/255, varying kappa")
+    print("=" * 65)
+
+    run_kappa_sweep(
+        surrogate, target_wrapped, test_loader,
+        epsilon  = 8/255,
+        kappas   = [5, 10, 20, 30, 40],
+        num_samples = 500
+    )
 
     # ── Plot ──────────────────────────────────────────────────────
     eps_list    = [e for e in EPSILONS if e > 0]
@@ -251,7 +391,7 @@ def run():
     plt.legend(fontsize=9)
     plt.tight_layout()
 
-    save_path = os.path.join(OUTPUT_DIR, "week4_transfer.png")
+    save_path = os.path.join(OUTPUT_DIR, "part4_transfer.png")
     plt.savefig(save_path, dpi=150)
     plt.close()
     print(f"\n  Plot saved to: {save_path}")

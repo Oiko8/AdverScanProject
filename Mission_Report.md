@@ -82,3 +82,4 @@ Model 1 (surrogate)                    Model 2 (target)
 ```
 
 - Change model 1 from resnet-18 to resnet-50 for better comparison with the adv. trained resnet-50. In the first parts the standard resnet-50 has similar behaviour on the pgd attack like the resnet-18, but breaks more easily.
+- The transfer attack is 3-4 times weaker than a direct attack despite using the same architecture as surrogate. This is the clearest possible evidence that adversarial training genuinely hardens the decision boundary — not just the gradient landscape.

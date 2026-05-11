@@ -83,3 +83,36 @@ Model 1 (surrogate)                    Model 2 (target)
 
 - Change model 1 from resnet-18 to resnet-50 for better comparison with the adv. trained resnet-50. In the first parts the standard resnet-50 has similar behaviour on the pgd attack like the resnet-18, but breaks more easily.
 - The transfer attack is 3-4 times weaker than a direct attack despite using the same architecture as surrogate. This is the clearest possible evidence that adversarial training genuinely hardens the decision boundary — not just the gradient landscape.
+
+
+--- 
+
+## Part 5
+
+---
+
+- Add model3 (a certified model) in the game! We pass the model 3 from the pipeline and we extract the results.
+- Model 2 was emprically robust. It was adversarially trained and performed well against known attacks. In the other hand the Model 3 is mathematically certified and fully robust up to a level (Pixel-DP style).
+- We load Gowal2020Uncovering from RobustBench under the L2 threat model. This is a wide ResNet model trained with adversarial training under L2 norm. No mathematical guarantees -> empirically robust.
+- The idea is to wrap it with our `Smooth` class to turn it into certified classifier.( Cohen et al.: Certified Adversarial Robustness via Randomized Smoothing) — it is a pure inference-time procedure.
+```
+Gowal2020Uncovering (base classifier)
+         +
+Smooth wrapper (sigma=0.25)
+         =
+Certified classifier with L2 radius guarantees
+```
+```
+L2 epsilon:   0    0.25   0.5    0.75   1.0    1.25   1.5
+              │                   │
+              │   certified zone  │    uncertified zone
+              │                   │
+Certified     │ ████████████████  │  ░░░░░░░░░░░░░░░░░
+accuracy:     │ guarantee holds   │  lower bound only
+              │                   │
+AutoAttack    │ ████████████████  │  ████░░░░░░░░░░░░░
+accuracy:     │ high (hard to     │  drops — attacks
+              │ attack here)      │  start finding
+              │                   │  adversarial examples
+```
+- Can an adversarial attack break a mathematically certified model?

@@ -13,7 +13,7 @@ EVAL_EPSILONS = [2/255, 4/255, 8/255]
 
 # PGD results from Week 1 for direct comparison
 PGD_ACCURACIES = {
-    2/255: 1.2,
+    2/255: 1.0,
     4/255: 0.0,
     8/255: 0.0,
 }
@@ -131,7 +131,7 @@ def run():
         print("  White-box attacks were sufficient. No masking signal.")
 
     # ── D4 update ─────────────────────────────────────────────────
-    print("\n── D4 Update (PGD vs AutoAttack gap) ───────────────────────")
+    print("\n── D6: Attack Hyperparameter Sensitivity (PGD vs AutoAttack) ──")
     max_gap     = max(PGD_ACCURACIES[e] - aa_accuracies[e]
                       for e in EVAL_EPSILONS)
     max_gap_eps = max(EVAL_EPSILONS,
@@ -159,7 +159,7 @@ def run():
     summary_lines.append(f"  D1 primary   (FGSM vs PGD)       : clear")
     summary_lines.append(f"  D1 secondary (Square vs APGD)     : "
                          f"{'FIRED' if any_d1 else 'clear'}")
-    summary_lines.append(f"  D4 (PGD step size ineffective)    : "
+    summary_lines.append(f"  D6 (attack hyperparameter sens.)  : "
                          f"{'FIRED' if max_gap > 5.0 else 'clear'}")
     summary_lines.append(f"  D5 (narrow robustness)            : FIRED")
     summary_lines.append("")

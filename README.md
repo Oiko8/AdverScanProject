@@ -62,7 +62,7 @@ Run PGD-L∞ with 100 steps, step size α = ε/10, three random restarts, across
 
 **Diagnostic checks at this stage:**
 - If robust accuracy drops to near-zero at ε = 2/255, the model has no meaningful robustness.
-- If FGSM accuracy exceeds PGD accuracy, this is the classical gradient masking signal and should be flagged immediately.
+- If PGD robust accuracy exceeds FGSM robust accuracy (i.e. FGSM breaks the model more than PGD does), this is the classical gradient masking signal and should be flagged immediately.
 - If the accuracy vs. epsilon curve shows a sudden cliff rather than gradual degradation, this signals that the model's robustness is narrow and brittle.
 - Monitor the PGD loss trajectory per iteration. If the loss fluctuates wildly rather than increasing monotonically, this indicates a non-smooth loss landscape — the k-WTA failure mode from Tramèr et al. Section 5.
 
@@ -116,7 +116,7 @@ Run EOT by averaging gradients over 40 noise samples per PGD step (following the
 
 Each diagnostic is a measurable condition derived from the stage outputs. The pipeline maps combinations of stage results onto these categories automatically.
 
-- **D1 — Gradient masking:** Triggered when FGSM accuracy > PGD accuracy, or when Square Attack (black-box) within AutoAttack outperforms APGD (white-box). The model is obfuscating its gradients, giving a false sense of robustness to gradient-based attacks.
+- **D1 — Gradient masking:** Triggered when FGSM robust accuracy < PGD robust accuracy, or when Square Attack (black-box) within AutoAttack outperforms APGD (white-box). The model is obfuscating its gradients, giving a false sense of robustness to gradient-based attacks.
 
 - **D2 — Transfer vulnerability:** Triggered when PGD robust accuracy > 60% but surrogate transfer success rate > 40%. The model's direct gradient is unhelpful for an attacker, but the decision boundary is still exploitable via a surrogate.
 
@@ -125,6 +125,7 @@ Each diagnostic is a measurable condition derived from the stage outputs. The pi
 - **D4 — Loss inconsistency:** Triggered when the PGD loss trajectory shows non-monotonic behavior across iterations. The loss surface is too non-smooth for gradient-based attacks to navigate reliably — this usually means the attack results are understating the model's vulnerability, not that the model is robust.
 
 - **D5 — Narrow robustness:** Triggered when robust accuracy drops sharply between two consecutive epsilon values (more than 30 percentage points between ε = 4/255 and ε = 8/255). The model has genuine robustness at small perturbation budgets but no robustness at the standard evaluation budget.
+- **D6 — Attack hyperparameter sensitivity:** Triggered when the gap between PGD robust accuracy and AutoAttack robust accuracy exceeds 5 percentage points at any evaluated epsilon. Indicates that fixed-step-size PGD is failing to optimize effectively where APGD's adaptive schedule succeeds. The model's reported robustness under PGD is not trustworthy — re-evaluate with AutoAttack before reporting numbers.
 
 ---
 
@@ -144,6 +145,7 @@ The remediation recommendations follow a fixed priority ordering:
 3. **If D2 fires:** your model's gradients are not representative of its true boundary. Consider ensemble adversarial training with diverse surrogate models.
 4. **If D3 fires:** add calibration regularization or temperature scaling to align confidence with actual boundary distance.
 5. **If D5 fires:** increase adversarial training epsilon or diversify the attack distribution used during training.
+6. **If D6 fires:** do not report PGD-only robust accuracy numbers. Use AutoAttack as the canonical robustness estimate, or use APGD with the adaptive step-size schedule.
 
 ---
 

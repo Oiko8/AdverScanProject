@@ -104,11 +104,11 @@ def pgd_loss_trajectory(model, images, labels, epsilon, steps=100):
 
 def check_d1(model, test_loader, pgd_accuracies):
     """
-    D1 fires if FGSM accuracy > PGD accuracy at any epsilon.
+    D1 fires if PGD robust accuracy > FGSM robust accuracy at any epsilon (FGSM breaking the model more than PGD signals gradient masking).
     pgd_accuracies: list of PGD accuracies matching EPSILONS order.
     """
     print("\n── D1: Gradient Masking Check (FGSM vs PGD) ──────────────────")
-    print(f"  {'Epsilon':<12} {'FGSM':>10} {'PGD':>10} {'FGSM > PGD':>12}")
+    print(f"  {'Epsilon':<12} {'FGSM':>10} {'PGD':>10} {'D1 signal':>12}")
     print(f"  {'-'*48}")
 
     d1_fired = False
@@ -126,7 +126,7 @@ def check_d1(model, test_loader, pgd_accuracies):
     print()
     if d1_fired:
         print("  D1 STATUS: FIRED — possible gradient masking detected.")
-        print("  FGSM outperforms PGD, which should not happen on a clean model.")
+        print("  FGSM breaks the model more than PGD does, which should not happen on a clean model.")
         print("  Interpretation: the model may be obfuscating gradients.")
     else:
         print("  D1 STATUS: clear — PGD is stronger than FGSM at all epsilons.")
@@ -207,7 +207,7 @@ def plot_trajectory(trajectory, d4_fired, epsilon=8/255):
 
 def run():
     # PGD accuracies from week1_baseline — paste your results here
-    pgd_accuracies = [88.7, 82.2, 73.9, 53.6, 14.4]
+    pgd_accuracies = [88.7, 82.2, 73.8, 53.7, 14.4]
 
     model = get_robust_model().to(DEVICE)
 

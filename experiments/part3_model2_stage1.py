@@ -14,7 +14,7 @@ from configs.settings import (
 # Model 1 PGD results for comparison
 MODEL1_PGD = {
     0/255: 92.6,
-    2/255: 1.2,
+    2/255: 1.0,
     4/255: 0.0,
     8/255: 0.0,
    16/255: 0.0,

@@ -129,8 +129,8 @@ def run():
         print("\n  D1 SECONDARY: clear — APGD-CE dominated throughout.")
         print("  White-box attacks were sufficient. No masking signal.")
 
-    # ── D4 update ─────────────────────────────────────────────────
-    print("\n── D4 Update (PGD vs AutoAttack gap) ───────────────────────")
+    # ── D6 update ─────────────────────────────────────────────────
+    print("\n── D6 Update (PGD vs AutoAttack gap) ───────────────────────")
     max_gap     = max(PGD_ACCURACIES[e] - aa_accuracies[e]
                       for e in EVAL_EPSILONS)
     max_gap_eps = max(EVAL_EPSILONS,
@@ -157,7 +157,7 @@ def run():
     summary_lines.append(f"  D1 primary   (FGSM vs PGD)       : clear")
     summary_lines.append(f"  D1 secondary (Square vs APGD)     : "
                          f"{'FIRED' if any_d1 else 'clear'}")
-    summary_lines.append(f"  D4 (PGD step size ineffective)    : "
+    summary_lines.append(f"  D6 (PGD step size ineffective)    : "
                          f"{'FIRED' if max_gap > 5.0 else 'clear'}")
     summary_lines.append(f"  D5 (narrow robustness)            : FIRED")
     summary_lines.append("")

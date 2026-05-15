@@ -5,7 +5,7 @@ import autoattack
 from configs.settings import DEVICE, EVAL_NUM_SAMPLES
 
 
-def run_autoattack(model, loader, epsilon,
+def run_autoattack(model, loader, epsilon, norm = "Linf",
                    num_samples=EVAL_NUM_SAMPLES,
                    model_expects_raw=False):
     """
@@ -75,7 +75,7 @@ def run_autoattack(model, loader, epsilon,
     # ── Run AutoAttack ─────────────────────────────────────────────
     adversary = autoattack.AutoAttack(
         eval_model,
-        norm="Linf",
+        norm=norm,
         eps=epsilon,
         version="standard",
         verbose=True

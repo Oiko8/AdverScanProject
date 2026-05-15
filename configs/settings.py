@@ -41,6 +41,7 @@ EVAL_NUM_SAMPLES = 1000   # run attacks on 1000 test images (standard in literat
 # ── Sccaling Epsilon ──────────────────────────────────────────────────────────
 # CIFAR-10 std values (per channel)
 CIFAR10_STD_VALUES = (0.2023, 0.1994, 0.2010)
+CIFAR10_MEAN_VALUES = (0.4914, 0.4822, 0.4465)
 
 def scale_epsilon(epsilon_raw):
     """

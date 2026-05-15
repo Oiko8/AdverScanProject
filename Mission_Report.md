@@ -110,6 +110,50 @@ Confirmed the C&W finding qualitatively: surrogate fool rate stays near 100% acr
 
 ---
 
+## Revision until here (Parts 1–4) 
+
+---
+
+
+This is a consolidated status check on everything completed so far. Each row is verified against the regenerated reports in `report/` and the plots in `outputs/`.
+
+### Diagnostic summary across models
+
+|         | D1 primary | D1 secondary |    D4    |    D5    |    D6    |    D2    |
+| ------- | ---------- | ------------ | -------- | -------- | -------- | -------- |
+| Model 1 |    clear   |     clear    |   clear  |   FIRED  |   clear  |    N/A   |
+| Model 2 |    clear   |     clear    |   clear  |   FIRED  |   clear  |   clear  |
+
+D3 not yet implemented end-to-end; will be added during the FAB-based boundary distance extraction step. D7 introduced in Part 5 (definition below).
+
+### Numerical consistency check
+
+After rerunning the full pipeline with the corrected epsilon scaling and ResNet-50 surrogate:
+
+- **Model 1 AutoAttack at ε=8/255**: 0.0%
+- **Model 2 AutoAttack at ε=8/255**: 51.0% (RobustBench leaderboard: 49.25% — within 2%, good sanity check)
+- **Model 2 PGD vs AutoAttack max gap**: 2.7% at ε=8/255 — under the 5% D6 threshold, so PGD is canonical here
+- **Transfer success rate at κ=20, ε=8/255**: 12.8% — far under the 40% D2 threshold
+
+### Key structural findings worth carrying into the writeup
+
+**1. Adversarial training reshapes the loss landscape, not just decision boundaries.** Model 1's PGD loss climbs to ~29 in 100 steps; Model 2's plateaus around 1.4. Same attack code, same hyperparameters — the 20× difference reflects fundamentally different loss surfaces. Model 1 lets PGD blow up cross-entropy almost unbounded; Model 2 caps it tightly. This is not gradient masking (D1 clears on both) — it's the natural consequence of training under adversarial perturbations.
+
+**2. The kappa sweep is the strongest single piece of evidence we have for Model 2's robustness.** Surrogate fool rate climbs 43% → 85% → 100% as κ goes from 5 to 20. Transfer success stays flat at ~12% across all κ values. Translation: even at maximum C&W confidence, Model 1's adversarials cannot transfer to Model 2. Model 2's decision boundary is genuinely far from Model 1's adversarial regions in input space — not just inaccessible to gradient-based attacks. This is the cleanest possible refutation of the C&W transferability hypothesis on this model pair.
+
+**3. D5 fires on both Model 1 and Model 2 but means different things.** On Model 1, it reflects total fragility (accuracy collapses to 0% past ε=2/255). On Model 2, it reflects the epsilon-boundary cliff: the model was trained at exactly ε=8/255, so robustness is concentrated at that budget and falls off sharply past it. This is a textbook adversarial-training finding (Madry et al.), not a defect. A diagnostic firing with completely different underlying meanings between two models is itself a signal worth flagging in the writeup.
+
+**4. D6's modest gap on Model 2 (~2-3%) is in the expected direction.** AutoAttack always finds slightly more adversarial examples than fixed-step PGD does. The gap stays under the 5% threshold, so PGD is reliable for this model, but AutoAttack remains the canonical estimate. If a future model showed D6 firing strongly, it would indicate that PGD's fixed step size was missing adversarial examples APGD's adaptive schedule finds — a real failure mode, not just slop.
+
+### Open items before Part 5
+
+- Rename "D4 (PGD step size ineffective)" → "D6 (attack hyperparameter sens.)" in `report/part3_autoattack.txt` (two-character fix in `experiments/part3_model2_stage2.py`).
+- D3 (boundary overconfidence) implementation deferred — small effort, can be added when extracting per-sample FAB results.
+
+Ready to proceed to Part 5 (randomized smoothing + certified accuracy).
+
+---
+
 ## Part 5
 
 ---
@@ -152,8 +196,58 @@ Precisely: a certified model with smoothing guarantees that within the certified
 
 The Stage 5 report for Model 3 should produce both numbers side-by-side and flag the gap explicitly.
 
----
+Train ResNet-50 with different noise:
+|  Sigma |   Accuracy   |
+| ------ | ------------ |
+|  0.25  |    71.8%     |
+|  0.50  |    61.1%     |
+|  0.75  |    43.8%     |
+|  1.00  |    33.6%     |
 
+Radius  |  σ=0.25  |  σ=0.50  |  σ=0.75  |  σ=1.00  |
+------- | -------- | -------- | -------- | -------- |
+0.00    |  76.7%   |  60.4%   |  47.9%   |  35.4%
+0.25    |  60.9%   |  49.0%   |  39.9%   |  30.1%
+0.50    |  42.7%   |  38.9%   |  31.5%   |  24.1%
+0.75    |  22.6%   |  26.5%   |  23.1%   |  18.8%
+1.00    |   0.0%   |  15.8%   |  16.4%   |  15.4%
+1.25    |   0.0%   |   8.1%   |  12.3%   |  11.3%
+1.50    |   0.0%   |   3.1%   |   6.4%   |   8.5%
+2.00    |   0.0%   |   0.0%   |   1.9%   |   3.8%
+2.50    |   0.0%   |   0.0%   |   0.0%   |   1.3%
+
+  σ   | abstain rate |
+----- | ------------ |
+0.25  |     7.3%     |
+0.50  |    17.0%     |
+0.75  |    29.0%     |
+1.00  |    32.2%     |
+
+- The σ trade-off is visible. for smaller radius the smaller σ gives the highest accuracy. However stronger sigmas lead to better accuracy for bigger radius of perturbation. Totally normal and agreed with Cohen et al.
+- Higher σ → base classifier more confused under noise → lower confidence → more p_A_lower ≤ 0.5 → more abstains.
+- at σ=1.00, the certificate is mostly empty not because the radii are small for certified images, but because so many images can't be certified at all.
+
+- The empirical numbers we get are an upper bound on what an attacker against the deployed smoothed model could achieve. D7's gap is therefore a lower bound on actual certificate looseness.
+- D7 flag overview: 
+    - So when empirical = 60% and certified = 58%, the certificate is tight — it's capturing nearly all the model's true robustness in its proof. The defender can trust the certified number as a near-faithful summary.
+    - When empirical = 75% and certified = 30%, the certificate is loose — the model is genuinely more robust than the proof can show. The defender's deployment is safer than the paperwork suggests. That's the D7 signal: your proof is conservative, not your model.
+    - This is not bad for the model. It's a defect of the evaluation methodology.
+
+The two possible attack targets
+1. Target A — Attack the base classifier:
+    - AutoAttack runs on wrapped_base, which is the underlying ResNet-50.
+    - It's deterministic — every forward pass returns the same logits.
+    - AutoAttack's gradient-based optimizers work cleanly.
+
+
+2. Target B — Attack the smoothed classifier directly:
+    - AutoAttack would run on the Smooth wrapper.
+    - Every forward pass adds fresh Gaussian noise — stochastic.
+    - Gradient-based attacks chase a noisy signal and converge poorly.
+    - Requires EOT (Expectation over Transformations): average gradients over 40+ noise samples per attack step.
+
+
+--- 
 ## Diagnostic glossary (current canonical definitions)
 
 - **D1 — Gradient masking.** Fires when PGD robust accuracy > FGSM robust accuracy (FGSM is more effective than PGD), or when Square Attack within AutoAttack outperforms APGD.
@@ -162,3 +256,4 @@ The Stage 5 report for Model 3 should produce both numbers side-by-side and flag
 - **D4 — Loss inconsistency.** Fires when the PGD loss trajectory across iterations is non-monotonic (>20% of steps show loss decrease).
 - **D5 — Narrow robustness.** Fires when robust accuracy drops by >30 percentage points between two consecutive epsilon values.
 - **D6 — Attack hyperparameter sensitivity.** Fires when the gap between PGD and AutoAttack robust accuracy exceeds 5 percentage points at any evaluated epsilon. Originally tracked as D4 in early drafts; renamed to keep D4 reserved for the loss-trajectory check.
+- **D7 — Certificate looseness.** Fires when, at some L2 radius within the certificate's claimed range, empirical robust accuracy exceeds certified accuracy by more than a threshold τ percentage points.

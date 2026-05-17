@@ -246,12 +246,27 @@ The two possible attack targets
     - Gradient-based attacks chase a noisy signal and converge poorly.
     - Requires EOT (Expectation over Transformations): average gradients over 40+ noise samples per attack step.
 
+---
+
+## Part 6
+
+---
 
 ### D3 Implementation (continue part 5)
 
+- D3 fires when small distance + high confidence happen together — the model is still confidently wrong right next to its own boundary. That's a calibration failure: confidence-based detectors won't catch these adversarials because the model doesn't know it's at its boundary.
+- Focusing on model 1 and 2. D3 superseded by certified accuracy for Model 3.
+- Thresholds:
+    - L2 dist < 0.5
+    - confidence > 0.8
+    - D3 fires if >20% of samples meet both.
+
+- SMOKE TEST: 
+    - *Boundary distance is small*. Mean L2 = 0.107 on Model 1 means boundaries sit about 1/10th of a unit from the data in L2. 
+    - *FAB success rate 92%, not 100%*. On a standard ResNet-50 with eps_cap=1.0, success should be ~100%. The 8% gap suggests either some samples are hyper-confident (FAB struggles when initial gradients are tiny) or n_restarts=1 is on the low end. Worth bumping to n_restarts=3 for the full run
 
 --- 
-## Diagnostic glossary (current canonical definitions)
+## Diagnostic glossary 
 
 - **D1 — Gradient masking.** Fires when PGD robust accuracy > FGSM robust accuracy (FGSM is more effective than PGD), or when Square Attack within AutoAttack outperforms APGD.
 - **D2 — Transfer vulnerability.** Fires when PGD robust accuracy > 60% AND surrogate transfer success rate > 40%.

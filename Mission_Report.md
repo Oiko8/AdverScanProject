@@ -265,6 +265,30 @@ The two possible attack targets
     - *Boundary distance is small*. Mean L2 = 0.107 on Model 1 means boundaries sit about 1/10th of a unit from the data in L2. 
     - *FAB success rate 92%, not 100%*. On a standard ResNet-50 with eps_cap=1.0, success should be ~100%. The 8% gap suggests either some samples are hyper-confident (FAB struggles when initial gradients are tiny) or n_restarts=1 is on the low end. Worth bumping to n_restarts=3 for the full run
 
+- Change approach and use CW attack from `transfer_attack.py`
+- NEW SMOKE TEST: 
+    ```
+      ── Smoke test — Model 1 @ eps=2/255 ──
+    Samples              : 100
+    Attack successes     : 98 (98.0%)
+    Mean conf (succ)     : 0.9917
+    Median conf (succ)   : 1.0000
+    Confidently wrong    : 97/98 (99.0%)
+    D3 status            : FIRED
+    ```
+
+--- 
+---
+
+Part 1 to 6 finished: 
+
+MODELS  |  D1 prim  |   D1 sec  |   D2     |   D3           |   D4     |   D5     |   D6     |   D7    | 
+------- | :-------: | :-------: | :------: | :------------: | :------: | :------: | :------: | :-----: |
+Model 1 |    clear  |    clear  |    N/A   |   FIRED        |   clear  |  FIRED   |   clear  |    N/A  |
+Model 2 |    clear  |    clear  |   clear  |  clear(8/255)  |   clear  |  FIRED   |   clear  |    N/A  |
+Model 3 |     N/A*  |     N/A*  |    N/A*  |       N/A*     |    N/A*  |   N/A*   |    N/A*  |   clear |
+
+
 --- 
 ## Diagnostic glossary 
 

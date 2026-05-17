@@ -15,10 +15,10 @@ from configs.save_report import save_report
 #   Config
 # ────────────────────────────────────────────────────────────────
 
-SMOKE_TEST = True   # flip to False for the full run
+SMOKE_TEST = False  # flip to False for the full run
 
 NUM_SAMPLES        = 1000
-EPSILONS           = [2/255]    # extend later: [2/255, 4/255, 8/255]
+EPSILONS           = [2/255, 4/255, 8/255]
 KAPPA              = 20.0
 STEPS              = 100
 ATTACK_BATCH_SIZE  = 128

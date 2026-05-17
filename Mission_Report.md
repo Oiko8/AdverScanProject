@@ -247,6 +247,9 @@ The two possible attack targets
     - Requires EOT (Expectation over Transformations): average gradients over 40+ noise samples per attack step.
 
 
+### D3 Implementation (continue part 5)
+
+
 --- 
 ## Diagnostic glossary (current canonical definitions)
 

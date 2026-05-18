@@ -23,7 +23,7 @@ The project is grounded in three explicit constraints from the literature:
 **In scope:**
 - Image classification on CIFAR-10
 - Four model types representing distinct robustness claims
-- Five diagnostic categories derived from the literature
+- Seven diagnostic categories derived from the literature
 - A before/after hardening demonstration
 - A developer-facing report with prioritized remediation guidance
 
@@ -112,7 +112,7 @@ Run EOT by averaging gradients over 40 noise samples per PGD step (following the
 
 ---
 
-## Part 5 — The Five Diagnostic Categories
+## Part 5 — The Seven Diagnostic Categories
 
 Each diagnostic is a measurable condition derived from the stage outputs. The pipeline maps combinations of stage results onto these categories automatically.
 
@@ -120,7 +120,7 @@ Each diagnostic is a measurable condition derived from the stage outputs. The pi
 
 - **D2 — Transfer vulnerability:** Triggered when PGD robust accuracy > 60% but surrogate transfer success rate > 40%. The model's direct gradient is unhelpful for an attacker, but the decision boundary is still exploitable via a surrogate.
 
-- **D3 — Boundary overconfidence:** Triggered when FAB finds adversarial examples close to the boundary (average L2 distance < ε/2) but the model's softmax confidence on those examples is high (> 0.8). The model is poorly calibrated near its decision boundary.
+- **D3 — Boundary overconfidence:** Triggered when a CW-Linf attack at small ε can make the model confidently wrong. We measure mean softmax confidence on successful adversarial examples; D3 fires when this exceeds 0.8 and the attack reaches at least 30% success (the floor ensures the confidence statistic is over a meaningful sample, not a handful of outliers). The diagnostic captures calibration at the decision boundary: a well-calibrated model that can be fooled should at least be uncertain about its wrong answers. Evaluated at ε ∈ {2/255, 4/255, 8/255} to separate two distinct failure modes — confidence saturation under attack budget pressure (Model 1) vs. genuine boundary uncertainty (Model 2 at 8/255).
 
 - **D4 — Loss inconsistency:** Triggered when the PGD loss trajectory shows non-monotonic behavior across iterations. The loss surface is too non-smooth for gradient-based attacks to navigate reliably — this usually means the attack results are understating the model's vulnerability, not that the model is robust.
 

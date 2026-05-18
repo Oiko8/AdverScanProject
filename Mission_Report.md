@@ -227,6 +227,55 @@ Radius  |  σ=0.25  |  σ=0.50  |  σ=0.75  |  σ=1.00  |
 - Higher σ → base classifier more confused under noise → lower confidence → more p_A_lower ≤ 0.5 → more abstains.
 - at σ=1.00, the certificate is mostly empty not because the radii are small for certified images, but because so many images can't be certified at all.
 
+### Empirical L2 attack on the base classifier
+
+AutoAttack-L2 on each base ResNet-50 at every radius, 1000 samples each. Reading: cert / emp / gap.
+
+|  r   |       σ=0.25       |       σ=0.50       |       σ=0.75       |       σ=1.00       |
+| ---- | ------------------ | ------------------ | ------------------ | ------------------ |
+| 0.00 | 76.7 / 71.8 / −4.9 | 60.4 / 60.6 / +0.2 | 47.9 / 46.7 / −1.2 | 35.4 / 36.0 / +0.6 |
+| 0.25 | 60.9 / 56.3 / −4.6 | 49.0 / 49.0 / +0.0 | 39.9 / 37.4 / −2.5 | 30.1 / 28.9 / −1.2 |
+| 0.50 | 42.7 / 39.8 / −2.9 | 38.9 / 34.8 / −4.1 | 31.5 / 28.0 / −3.5 | 24.1 / 21.8 / −2.3 |
+| 0.75 | 22.6 / 25.5 / +2.9 | 26.5 / 25.7 / −0.8 | 23.1 / 20.1 / −3.0 | 18.8 / 17.1 / −1.7 |
+| 1.00 |  0.0 / 13.9 / —    | 15.8 / 18.0 / +2.2 | 16.4 / 13.9 / −2.5 | 15.4 / 12.5 / −2.9 |
+| 1.25 |  0.0 /  5.6 / —    |  8.1 / 11.2 / +3.1 | 12.3 /  9.0 / −3.3 | 11.3 /  9.9 / −1.4 |
+| 1.50 |  0.0 /  1.6 / —    |  3.1 /  5.8 / +2.7 |  6.4 /  5.5 / −0.9 |  8.5 /  7.1 / −1.4 |
+| 2.00 |  0.0 /  0.1 / —    |  0.0 /  0.8 / —    |  1.9 /  2.4 / +0.5 |  3.8 /  3.2 / −0.6 |
+| 2.50 |  0.0 /  0.0 / —    |  0.0 /  0.3 / —    |  0.0 /  1.1 / —    |  1.3 /  1.7 / +0.4 |
+
+Gaps marked "—" are outside the certifiable range (cert = 0 by construction, i.e. beyond what σ·Φ⁻¹(p_A) can reach at this CERT_N). `analyze_d7` excludes them — a "gap" at a radius where the certificate makes no claim isn't certificate looseness, it's outside the contract.
+
+### D7 verdict per σ
+
+|  σ   | max gap | at r | D7    |
+| ---- | ------- | ---- | ----- |
+| 0.25 | +2.9%   | 0.75 | clear |
+| 0.50 | +3.1%   | 1.25 | clear |
+| 0.75 | +0.5%   | 2.00 | clear |
+| 1.00 | +0.6%   | 0.00 | clear |
+
+D7 clears at every σ. The maximum gap anywhere is 3.1pp, an order of magnitude below the 20pp threshold. The threshold was set conservatively before any data existed; with these numbers it does no work. Worth recalibrating to ~5pp once the proxy-methodology question below is settled.
+
+### The negative-gap pattern
+
+The substantive observation is the *sign* of the gaps. At σ ≥ 0.75, every gap within the certifiable range is negative — base_emp tracks below cert throughout. This is not a certificate violation. Two facts both hold:
+
+- `cert ≤ smoothed_emp` — by smoothing theory, the certificate is a lower bound on the smoothed classifier's robust accuracy.
+- `base_emp ≤ smoothed_emp` — by construction, AutoAttack on the deterministic base is strictly stronger than any EOT attack on the smoothed classifier could be.
+
+When `base_emp < cert`, both inequalities still hold; they simply fail to squeeze smoothed_emp into a tight interval. The smoothed model's true robust accuracy sits above both curves, and the proxy comparison cannot tell us by how much.
+
+The pattern is most pronounced at σ ≥ 0.75 because the noise-augmented base loses clean accuracy as σ grows (76.7% → 60.4% → 47.9% → 35.4% at r=0), while the smoothed classifier — which always sees noisy input by construction — stays in its training distribution. Base and smoothed diverge in capability as σ increases, and the base-as-proxy comparison degrades accordingly.
+
+### Reading D7-clear honestly
+
+Two interpretations of D7 clearing everywhere are both consistent with the data:
+
+1. **Certificates are tight.** The proof captures nearly all of the smoothed model's true robustness, leaving little room for D7 to fire.
+2. **Proxy is too weak.** Attacking the base degrades as a stand-in for attacking the smoothed model as σ grows. We're measuring `base_emp − cert`, not `smoothed_emp − cert`.
+
+The negative gaps at σ ≥ 0.75 lean toward (2). The natural next step would be a small EOT run at σ=0.75, r ∈ {1.0, 1.25, 1.5} to replace the lower-bound proxy with a direct measurement on the smoothed classifier. That's not done here — compute reasons documented in the design notes for this Part — so the framing should be: **D7 clearing is a failure to find looseness with the chosen methodology, not a proof of tightness.** (--> absence of evidence ≠ evidence of absence)
+
 - The empirical numbers we get are an upper bound on what an attacker against the deployed smoothed model could achieve. D7's gap is therefore a lower bound on actual certificate looseness.
 - D7 flag overview: 
     - So when empirical = 60% and certified = 58%, the certificate is tight — it's capturing nearly all the model's true robustness in its proof. The defender can trust the certified number as a near-faithful summary.
@@ -245,6 +294,18 @@ The two possible attack targets
     - Every forward pass adds fresh Gaussian noise — stochastic.
     - Gradient-based attacks chase a noisy signal and converge poorly.
     - Requires EOT (Expectation over Transformations): average gradients over 40+ noise samples per attack step.
+
+
+### Design notes
+
+**The `cert > 0` filter in `analyze_d7`.** D7 only counts radii where the certificate makes a non-trivial claim. The maximum certifiable radius at noise level σ is σ·Φ⁻¹(p_A_upper), bounded near 3.4σ at our CERT_N=10000. Beyond that, cert = 0% by construction — not because the certificate failed, but because the smoothing theory doesn't bound that regime at all. A "gap" at a radius outside the contract isn't certificate looseness, it's the empirical attack venturing into territory the certificate never claimed. Excluding those cells from D7 is the principled choice; the empirical numbers themselves are kept in the main table for completeness. (Worked example: σ=0.25, r=1.00 shows empirical 13.9% against cert 0%. The model genuinely classifies 13.9% of perturbed images correctly there, but D7 has nothing to say about it — r=1.00 is past the σ=0.25 certificate's reach by construction.)
+
+**D7 threshold.** Set at 20pp before any data existed. The observed max gap is 3.1pp — an order of magnitude under threshold. The 20pp ceiling does no actual work in this evaluation. A more useful threshold post-data would be ~5pp, which would still leave all four σ values comfortably clear but at least put the diagnostic in a regime where firing is plausible. Worth recalibrating before the writeup.
+
+**EOT skipped intentionally.** The principled empirical evaluation would attack the smoothed classifier directly via EOT (40+ noise samples per gradient step). At the certification grid we ran (4 σ × 9 radii × 1000 samples), AutoAttack on the base classifier took ~30 hours; an EOT equivalent at 40× the cost would be ~50 days. Skipping EOT shifts the diagnostic from "true certificate looseness" to "lower bound on certificate looseness" — methodologically weaker but tractable. This is the trade-off behind every result reported in this Part.
+
+**Sample size.** N=1000 per radius for both certification and empirical attack, matching Cohen et al.'s evaluation. At N=1000 the 95% CI on a Bernoulli proportion is ±~3pp, finer resolution than any diagnostic threshold in this Part needs. Scaling to N=10000 would tighten the CI to ±~1pp but doesn't change any verdict — and at 10× the runtime, it doesn't earn its cost on this workload.
+
 
 ---
 
@@ -276,6 +337,40 @@ The two possible attack targets
     Confidently wrong    : 97/98 (99.0%)
     D3 status            : FIRED
     ```
+
+
+### Full run results
+
+CW-Linf, κ=20, 100 steps, 1000 samples per (model, ε). D3 thresholds: success_rate ≥ 30% to evaluate, mean confidence > 0.8 to fire.
+
+| eps    | model   | success% | mean_conf | confident-wrong% | D3            |
+| ------ | ------- | -------- | --------- | ---------------- | ------------- |
+| 2/255  | Model 1 | 98.9%    | 0.9914    | 98.6%            | FIRED         |
+| 2/255  | Model 2 | 7.2%     | n/a       | n/a              | not evaluable |
+| 4/255  | Model 1 | 100.0%   | 0.9999    | 100.0%           | FIRED         |
+| 4/255  | Model 2 | 17.8%    | n/a       | n/a              | not evaluable |
+| 8/255  | Model 1 | 100.0%   | 1.0000    | 100.0%           | FIRED         |
+| 8/255  | Model 2 | 38.3%    | 0.5869    | 15.4%            | clear         |
+
+### Findings
+
+**Model 1 saturates the failure.** Mean confidence climbs 0.991 → 0.9999 → 1.0000 across the three budgets, with median 1.0 at every ε. Even at 2/255 — where the L∞ ball is tiny — the wrong predictions get assigned probability ~1.0. This is the cleanest possible empirical instance of the Tramèr §6 / *Odds Are Odd* claim that standard networks are overconfident at their decision boundaries.
+
+**Model 2 at 2/255 and 4/255 is "not evaluable", and that is itself the answer.** Success rates of 7.2% and 17.8% mean we cannot gather enough adversarial examples for the confidence statistic to be meaningful. The diagnostic is short-circuited by robustness: at small ε the boundary is geometrically out of reach, so calibration *at* the boundary is moot.
+
+**Model 2 at 8/255 — D3 clear, mean confidence 0.587, median 0.573.** The CW objective targeted margin 20; the achieved confidence corresponds to a margin of roughly 0.3, a small fraction of the target. Within the ε=8/255 L∞ ball, Model 2's loss surface is flat enough that the attack hits the budget cap well before reaching margin 20. The contingency we had prepared — re-running at κ=5 to escape attack-construction saturation — turned out to be unnecessary: the budget itself is the binding constraint, not κ.
+
+### Cross-diagnostic corroboration
+
+This finding agrees with Part 3's loss-trajectory observation:
+
+> Model 1's PGD loss climbs to ~29 in 100 steps; Model 2's plateaus around 1.4. Same attack code, same hyperparameters — the 20× difference reflects fundamentally different loss surfaces.
+
+Part 6 measures the same phenomenon from the confidence angle. The 20× ratio in loss-trajectory ceilings between Models 1 and 2 shows up here as the gap between κ=20 (targeted margin) and the ~0.3 margin Model 2 actually permits within the budget. Two diagnostics independently reading the same property of the same model is the strongest form of evidence the pipeline can produce.
+
+### What D3 says that other diagnostics do not
+
+Adversarial training is known to push decision boundaries farther from data (D5, Part 3 robust accuracy). What's less commonly discussed is whether it also fixes *calibration* at those boundaries. D3 says yes: Model 2 at 8/255 doesn't just resist being fooled — when it is fooled, it stays uncertain about the wrong answer. Mean confidence 0.587 on successful adversarials means a simple confidence-based detector (flag predictions below 0.7) would catch about half of them. The same detector on Model 1 would catch zero — confidence is pinned at 1.0 across the entire adversarial population.
 
 --- 
 ---

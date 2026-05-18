@@ -384,7 +384,139 @@ Model 2 |    clear  |    clear  |   clear  |  clear(8/255)  |   clear  |  FIRED 
 Model 3 |     N/A*  |     N/A*  |    N/A*  |       N/A*     |    N/A*  |   N/A*   |    N/A*  |   clear |
 
 
---- 
+---
+
+## Part 7
+ 
+---
+ 
+### Goal
+ 
+Add Model 4 (ME-Net) and Stage 5 (EOT) to the pipeline. The point of Model 4
+is not to add another data point to the diagnostic table — it is to produce
+the **gradient-masking** signals that Models 1, 2, 3 never produced.
+Specifically, we want to see:
+ 
+- **D1 secondary** firing (Square Attack outperforms APGD-CE within
+  AutoAttack — the canonical gradient-masking tell from Tramèr §11)
+- **D4** plausibly firing (non-monotonic PGD loss from in-step stochastic
+  forward passes)
+- **The Stage 1 vs Stage 5 gap** — vanilla PGD reports false robustness on
+  Model 4, EOT-PGD recovers near-zero accuracy. The gap is the headline
+  number.
+### ME-Net implementation choice
+ 
+We did not use the released 2018 ME-Net repo. We wrote a clean from-scratch
+PyTorch implementation in `models/menet.py` for three reasons:
+ 
+1. The original code is pinned to PyTorch 0.3/0.4 and uses cvxpy for matrix
+   completion, which is not GPU-native. Patching it for current PyTorch +
+   pinning a cvxpy version that still installs is non-trivial.
+2. The algorithm is short — random mask + USVT (single SVD truncation) — so
+   a reimplementation is less work than a port.
+3. The project already has precedent: the `Smooth` class is Cohen et al.
+   from scratch, not the released repo.
+**ME-Net configuration (defaults in `models/menet.py` and
+`experiments/part7_menet.py`):**
+ 
+| Parameter | Value | Notes |
+| --------- | ----- | ----- |
+| `p_keep`  | 0.50  | Fraction of pixels retained per mask. Paper's standard. |
+| `rank`    | 10    | USVT top-k retained per channel. Paper used 5–10. |
+| Matrix completion | USVT (top-k truncated SVD) | Soft-Impute would be more faithful to paper but adds 5–10× cost; USVT captures the defense's mechanism. |
+| Mask granularity | per-spatial-location | Same mask broadcast across the 3 channels. |
+ 
+### Pipeline integration
+ 
+| Stage | Model 4 behavior expected | Reason |
+| ----- | ------------------------ | ------ |
+| 1 (PGD)            | "high" robust accuracy at 8/255 | gradient-mask false-positive |
+| 2 (AutoAttack)     | Square Attack > APGD-CE         | D1 secondary fires |
+| 3 (boundary D3)    | N/A                              | not run on Model 4 in Part 7 |
+| 4 (transfer)       | tractable (forward-only)         | optional follow-up, not core |
+| 5 (EOT-PGD, K=40)  | near-zero at 8/255              | strict generalization of Stage 1 |
+| D4 (loss traj.)    | possibly FIRED                   | in-step mask noise → bouncy loss |
+ 
+### Training (Model 4 base CNN)
+ 
+Run before the experiment driver:
+ 
+```
+python -m models.train_menet 0.5 10
+# or
+./train_menet.sh 0.5 10
+```
+ 
+Saves to `models/model4_menet_base_p50_r10_resnet50.pth`. Wall-clock budget
+is comparable to a single `train_with_noise` run (Model 3): one GPU,
+30 epochs, expect a few hours.
+ 
+### Experiment driver
+ 
+```
+python -m experiments.part7_menet
+```
+ 
+EOT-PGD is expensive: 40 forwards per step × 100 steps × 3 restarts per
+image × 1000 images × 3 epsilons. Budget several hours per epsilon on a
+single modern GPU. The driver runs Stage 1 first (cheap), then Stage 2,
+then the D1/D4 diagnostics, then Stage 5 last.
+ 
+### Results (TODO — fill in after running)
+ 
+```
+| eps    | Stage 1 PGD | Stage 2 AA | Stage 5 EOT | Gap (S1 - S5) |
+| ------ | ----------- | ---------- | ----------- | ------------- |
+| 2/255  |             |            |             |               |
+| 4/255  |             |            |             |               |
+| 8/255  |             |            |             |               |
+```
+ 
+Component breakdown at the headline ε=8/255 (TODO):
+ 
+```
+APGD-CE   : __%
+APGD-DLR  : __%
+FAB       : __%
+Square    : __%   <- if lower than APGD-CE, D1 secondary fires
+```
+ 
+Diagnostic summary on Model 4 (TODO):
+ 
+| Diagnostic        | Status | Evidence |
+| ----------------- | ------ | -------- |
+| D1 primary        |        |          |
+| D1 secondary      |        |          |
+| D4                |        |          |
+| EOT gap (S1-S5)   |        |          |
+ 
+### Known caveats to address in the writeup
+ 
+- **AutoAttack on a stochastic model.** Standard AutoAttack treats the model
+  as deterministic. On Model 4 each forward gives a different gradient.
+  The component-breakdown numbers will fluctuate run-to-run. The signal we
+  want — Square Attack out-performing APGD — is robust to this noise
+  because the gap is large when the defense is actually gradient-masking,
+  but we should note the limitation. If D1 secondary is borderline,
+  re-run with `version="rand"` in the AutoAttack call (adds EOT around
+  the white-box components).
+- **EOT K=40.** From the Tramèr §15 protocol. Lower K (e.g. 20) would also
+  work qualitatively but the per-step gradient estimate gets noisy enough
+  that PGD's progress slows. Higher K (e.g. 80) costs 2× for marginal gain.
+  K=40 is the well-trodden default.
+- **EOT vs BPDA.** ME-Net's mask is non-differentiable in the strict sense
+  (binary), but the surrounding USVT reconstruction passes meaningful
+  gradient through to unmasked pixels. EOT alone is sufficient. BPDA
+  (substituting identity in the backward pass) would be the next step for
+  a fully non-differentiable defense; we don't need it here.
+- **Majority-vote evaluation.** Robust-accuracy numbers on Model 4 are
+  computed under majority vote over 20 stochastic forwards per
+  adversarial example, not a single pass. Single-pass accuracy fluctuates
+  several percent purely from mask draws and would not be a stable
+  diagnostic.
+
+---
+
 ## Diagnostic glossary 
 
 - **D1 — Gradient masking.** Fires when PGD robust accuracy > FGSM robust accuracy (FGSM is more effective than PGD), or when Square Attack within AutoAttack outperforms APGD.
